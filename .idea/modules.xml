@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ast-instrumentation.iml" filepath="$PROJECT_DIR$/.idea/modules/ast-instrumentation.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ast-instrumentation_main.iml" filepath="$PROJECT_DIR$/.idea/modules/ast-instrumentation_main.iml" group="ast-instrumentation" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/ast-instrumentation_test.iml" filepath="$PROJECT_DIR$/.idea/modules/ast-instrumentation_test.iml" group="ast-instrumentation" />
+    </modules>
+  </component>
+</project>

@@ -1,0 +1,87 @@
+In your second homework assignment, which is built on your first homework, you will gain experience with using third-party components for parsing Java code, gaining deeper understanding of the Java grammar, Java modules and scopes, working with the design pattern Visitor, and interacting with the JVM programmatically using its exposed interfaces. We refer to the codebase that you create as a result of this homework as a program and we refer to the Java code that your program processes as a Java application. The git repo for HW2 can be cloned using the command git clone git@bitbucket.org:CS_474_2017/cs474_2017_hw2.git.
+
+You must create your account at BitBucket https://bitbucket.org/, if you haven't done so in your first homework. Just to remind you, it is imperative that you use your UIC email account that has the extension @uic.edu. Once you create an account with your UIC address, BibBucket will assign you an academic status that allows you to create private repos. Bitbucket users with free accounts cannot create private repos, which are essential for submitting your homeworks and projects. You will use IntelliJ, the JDK, and other supporting tools as you did it in your homework 1. For the setup please consult the description of the prior homework 1.
+
+Your homework assignment is to create an instrumentation program that takes the syntactically correct source code of the Java application that you selected and used in your homework 1, and using the Eclipse Java Anbstract Syntax Tree (AST) parser, the application is parsed into a tree. Next, in your program the nodes of the tree are traversed in some order using the pattern Visitor to compute scopes and variables that are declared and used in them. Then, for each expression and statement in a scope, your program will insert an instrumenting statement (e.g., a logging statement) to capture the values of the variables. This instrumenting statement is based on a template code fragment that you will define, and inserting this template into the parsed program will instantiate the template with the references to concrete variables whose values are captured in the given scope. Once the instrumentation procedure is finished, the parse tree is unparsed  (i.e., the source code is generated from the parse tree) and the instrumented source code is outputted (e.g., the original file f.java may be renamed into _old_f.java and the instrumented code is written into f.java).
+
+For example, consider the following code fragment:
+while( a.f < 10 ){//line 10
+	b = f(a);		//line 11
+}
+When traversing the parse tree, it is determined that the field f of the object a is used in line 10 and the object a is used in line 11 and the value of the variable b is assigned. As a result of your instrumentation, the changed code may look like the following:
+while( a.f != null ){//line 10
+	TemplateClass.instrum(10, "While", pair("package.class.method.a.f", a.f));
+	b = f(a);		//line 12
+	TemplateClass.instrum(12, "Assign", pair("package.class.method.a", a), pair("package.class.method.b", b));
+}
+
+The method instrum is a static member of your template class TemplateClass, its first argument is the line number, the second argument is the type of the instrumented statement, and the following arguments are the captured variables. The gist of this homework is to learn how to use the Eclipse AST parser Application Programming Interface (API) as well as to gain new knowledge about various grammatical constructs of the Java programming language. You can find a lot of information on the Internet about the Java Eclipse AST parser including the Eclipse documentation pages (search for ASTParser Eclipse). Please make sure that you resolve dependencies and import required libraries including the following org.eclipse.jdt.{annotation, apt.core, compiler, runtime} and org.osgi.core. When you get an error message, search what library is required to resolve a specific dependency and add it. To get you started on the Eclipse Parser, please use the following code fragment below.
+
+ASTParser parser = ASTParser.newParser(AST.JLS8);
+parser.setKind(ASTParser.K_COMPILATION_UNIT);
+parser.setResolveBindings(true);
+Map options = JavaCore.getOptions();
+parser.setCompilerOptions(options);
+String unitName = "test.java";
+parser.setUnitName(unitName);
+String[] sources = { source_path };
+String[] classpath = {};
+parser.setEnvironment(classpath, sources, new String[] { "UTF-8"}, true);
+parser.setSource(readFileToString(filepath).toCharArray());
+final CompilationUnit cu = (CompilationUnit) parser.createAST(null);
+
+Once the application is instrumented, it is compiled and run using a build script and as a result of its execution it will output a trace into a file that contains instrumentation statements with variable paths and values, lines of the executed code, and the types of the executed statements.
+
+For SIX additional bonus points, I offer the following additional task in this homework. Your program will construct a table of all variables and their bindings in the application's scopes, and this table will include the path to a variable, its declaration in the line of the code, and each variable will be assigned a unique identifier. Next, once instrumented and compiled, your program will run multiple instances of the instrumented application with different input values by starting the JVM, loading the classes of the instrumented application, and running the method main automatically. Below is the example code that you can use to bootstrap your work.
+import com.sun.jdi.VirtualMachine;
+import com.sun.jdi.Bootstrap;
+import com.sun.jdi.connect.*;
+LaunchingConnector conn = null;
+List<Connector> connectors = Bootstrap.virtualMachineManager().allConnectors();
+for (Connector connector : connectors) {
+    if (connector.name().equals("com.sun.jdi.CommandLineLaunch")) {
+        conn = (LaunchingConnector)connector;
+    }
+}
+if(conn == null) 	throw new Error("No launching connector");
+Map<String, Connector.Argument> arguments = conn.defaultArguments();
+Connector.Argument mainArg = (Connector.Argument)arguments.get("main");
+mainArg.setValue("test");
+Connector.Argument options =(Connector.Argument)arguments.get("options");
+File f = null;
+String currentDir = System.getProperty("user.dir");
+System.out.println(currentDir);
+String option_val;
+option_val = "-cp " + currentDir + "\\src\\main\\java";
+options.setValue(option_val);
+VirtualMachine vm = conn.launch(arguments);        	
+EventManager mgr = new EventManager(vm);
+mgr.setEventRequests();
+mgr.start();          
+Process process = vm.process();
+StreamRedirectThread outThread = new StreamRedirectThread("output reader", process.getInputStream(), System.out);
+outThread.start();
+
+Instead of outputting the instrumented code into a file directly, you will pass the trace information from the executing Java application into the program directly. Instead of using fully qualified names of the variables, you will use their identifiers from the scope table. That is, when the statement TemplateClass.instrum(12, "Assign", a, b); is executed in the Java application, it will insert a node into a linked list (or some other data structure that you choose) that is hosted in the program, and this inserted node will map to the values of the variables a and b in the assign statement in line 12 in the Java application. Please feel free to offer some clever optimizations and tricks for additional bonus points.
+
+Separate repositories are already created for each of your homeworks and for the course project. You will find a corresponding entry for this homework. You will fork this repository and your fork will be private, no one else besides you, the TA and your course instructor will have access to your fork. Please remember to grant a read access to your repository to your TA and your instructor. In future, for the team homeworks and the course project, you should grant the write access to your forkmates. You can commit and push your code as many times as you want. Your code will not be visible and it should not be visible to other students (except for your forkmates for a team project, but not for this homework). When you push the code into the remote repo, your instructor and the TA will see your code in your separate private fork. Making your fork public or inviting other students to join your fork for an individual homework will result in losing your grade. For grading, only the latest push timed before the deadline will be considered. If you push after the deadline, your grade for the homework will be zero. For more information about using the Git and Bitbucket specifically, please use this link as the starting point https://confluence.atlassian.com/bitbucket/bitbucket-cloud-documentation-home-221448814.html. For those of you who struggle with the Git, I recommend a book by Ryan Hodson on Ry's Git Tutorial. The other book called Pro Git is written by Scott Chacon and Ben Straub and published by Apress and it is freely available https://git-scm.com/book/en/v2/. There are multiple videos on youtube that go into details of the Git organization and use.
+
+Please follow this naming convention while submitting your work : "Firstname_Lastname_hw2", so that we can easily recognize your submission. I repeat, make sure that you will give both your TA and me read access to your private forked repository.
+
+You can post questions and replies, statements, comments, discussion, etc. on Piazza. Remember that you cannot share your code and your solutions (beyond your group for a team homework), but you can ask and advise others using Piazza on where resources and sample programs can be found on the internet, how to resolve dependencies and configuration issues, and how to design the logic of the algorithm. Yet, your implementation should be your own and you cannot share it. Alternatively, you cannot copy and paste someone else's implementation and put your name on it. Your submissions will be checked for plagiarism. When posting question and answers on Piazza, please select the appropriate folder, i.e., hw1 to ensure that all discussion threads can be easily located.
+
+Submission deadline: Sunday, October 8 at 11PM CST. Your submission will include the application's source code, the InteliJ project files, the Gradle and SBT build configurations, the README.md file in the root directory that contains the description of your implementation with tests, how to compile and run it using SBT and Gradle, and what the limitations of your implementation are. 
+
+THE INSTRUCTOR (and the TA) WILL NOT ANSWER ANY REQUESTS FROM STUDENTS STARTING 7PM THE EVENING OF THE SUBMISSION DEADLINE.
+
+Evaluation criteria:
+- the maximum grade for this homework is 5% with additional 6% bonus points as outlined above. Points are subtracted from this maximum grade: for example, saying that 2% is lost if some requirement is not completed means that the resulting grade will be 5%-2% => 3%; if the core homework functionality does not work, no bonus points will be given;
+- no IntelliJ project files, Gradle and/SBT build scripts: up to 3% lost;
+- no tests: up to 4% lost;
+- missing a subset of the Java grammar in your instrumentation: up to 3% lost;
+- the code does not compile or it crashes without completing the core functionality: up to 5% lost;
+- the documentation is missing or insufficient to understand how to compile and run your program: up to 4% lost;
+- only a subset of your submission works: up to 3% lost;
+- the minimum grade for this homework cannot be less than zero.
+
+That's it, folks!
